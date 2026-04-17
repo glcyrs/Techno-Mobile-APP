@@ -5,12 +5,16 @@ import {
 } from "recharts";
 
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package
+  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package,
+  ArrowLeft
 } from "lucide-react";
 
+import { useNavigate } from "react-router-dom";
 import { format, subDays, startOfDay, isAfter } from "date-fns";
 
 export default function Statistics() {
+  const navigate = useNavigate();
+
   const [products, setProducts] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +68,6 @@ export default function Statistics() {
   const totalUnitsSold = salesMovements.reduce((s, m) => s + (m.quantity || 0), 0);
   const totalStockIn = stockInMovements.reduce((s, m) => s + (m.quantity || 0), 0);
 
-  // DAILY DATA
   const dailyMap = {};
   for (let i = days - 1; i >= 0; i--) {
     const d = format(subDays(new Date(), i), "MMM d");
@@ -86,7 +89,6 @@ export default function Statistics() {
 
   const dailyData = Object.values(dailyMap).slice(-14);
 
-  // TOP PRODUCTS
   const productSales = {};
 
   salesMovements.forEach((m) => {
@@ -115,9 +117,17 @@ export default function Statistics() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 space-y-5 text-gray-800">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-end">
-        <div>
+      {/* HEADER WITH BACK BUTTON */}
+      <div className="flex items-center gap-3">
+
+        <button
+          onClick={() => navigate("/profile")}
+          className="p-2 rounded-xl bg-white border shadow-sm active:scale-95 transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+
+        <div className="flex-1">
           <h1 className="text-xl font-bold">Statistics</h1>
           <p className="text-sm text-gray-500">
             Revenue & Performance Overview
@@ -139,11 +149,7 @@ export default function Statistics() {
       {/* STATS CARDS */}
       <div className="grid grid-cols-2 gap-3">
 
-        <StatCard
-          label="Revenue"
-          value={fmt(totalRevenue)}
-          icon={DollarSign}
-        />
+        <StatCard label="Revenue" value={fmt(totalRevenue)} icon={DollarSign} />
 
         <StatCard
           label="Profit"
@@ -153,24 +159,13 @@ export default function Statistics() {
           sub={`${grossMargin}% margin`}
         />
 
-        <StatCard
-          label="Units Sold"
-          value={totalUnitsSold}
-          icon={ShoppingCart}
-        />
-
-        <StatCard
-          label="Stock In"
-          value={totalStockIn}
-          icon={Package}
-        />
+        <StatCard label="Units Sold" value={totalUnitsSold} icon={ShoppingCart} />
+        <StatCard label="Stock In" value={totalStockIn} icon={Package} />
       </div>
 
-      {/* LINE CHART */}
+      {/* CHARTS (unchanged) */}
       <div className="bg-white border rounded-2xl shadow-sm p-4">
-        <p className="text-sm font-semibold mb-3">
-          Revenue vs Profit
-        </p>
+        <p className="text-sm font-semibold mb-3">Revenue vs Profit</p>
 
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={dailyData}>
@@ -184,11 +179,8 @@ export default function Statistics() {
         </ResponsiveContainer>
       </div>
 
-      {/* TOP PRODUCTS */}
       <div className="bg-white border rounded-2xl shadow-sm p-4">
-        <p className="text-sm font-semibold mb-3">
-          Top Products
-        </p>
+        <p className="text-sm font-semibold mb-3">Top Products</p>
 
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={topProducts} layout="vertical">
@@ -200,7 +192,6 @@ export default function Statistics() {
         </ResponsiveContainer>
       </div>
 
-      {/* P&L */}
       <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-2">
         <p className="text-sm font-semibold">Profit & Loss</p>
 
@@ -214,7 +205,6 @@ export default function Statistics() {
 }
 
 /* UI COMPONENTS */
-
 function StatCard({ label, value, icon: Icon, color = "text-blue-600", sub }) {
   return (
     <div className="bg-white border rounded-2xl p-4 shadow-sm">
@@ -222,12 +212,8 @@ function StatCard({ label, value, icon: Icon, color = "text-blue-600", sub }) {
         <Icon className={`h-4 w-4 ${color}`} />
         {label}
       </div>
-
       <p className="text-lg font-bold">{value}</p>
-
-      {sub && (
-        <p className="text-xs text-gray-500">{sub}</p>
-      )}
+      {sub && <p className="text-xs text-gray-500">{sub}</p>}
     </div>
   );
 }

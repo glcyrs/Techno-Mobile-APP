@@ -523,7 +523,7 @@ export default function ProductDetail() {
         <DialogFooter className="mt-4 ">
       <Button 
         onClick={handleEdit}
-        className="w-full text-white bg-green-500 hover:bg-green-600 rounded-xl"
+        className="w-full text-white bg-gradient-to-r from-blue-400 to-blue-700 hover:to-blue-800 rounded-xl"
         >Save</Button>
             </DialogFooter>
           </DialogContent>

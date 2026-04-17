@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Save } from "lucide-react";
+import { Save, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
+  const navigate = useNavigate();
+
   const [lowStockDefault, setLowStockDefault] = useState(5);
   const [currency, setCurrency] = useState("PHP");
   const [saving, setSaving] = useState(false);
@@ -9,7 +12,6 @@ export default function Settings() {
   const handleSave = () => {
     setSaving(true);
 
-    // simulate save (frontend only)
     localStorage.setItem(
       "settings",
       JSON.stringify({
@@ -27,12 +29,23 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 space-y-5 text-gray-800">
 
-      {/* HEADER */}
-      <div>
-        <h1 className="text-xl font-bold">Settings</h1>
-        <p className="text-sm text-gray-500">
-          App preferences & defaults
-        </p>
+      {/* HEADER WITH BACK BUTTON */}
+      <div className="flex items-center gap-3">
+
+        <button
+          onClick={() => navigate("/profile")}
+          className="p-2 rounded-xl bg-white border shadow-sm active:scale-95 transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+
+        <div>
+          <h1 className="text-xl font-bold">Settings</h1>
+          <p className="text-sm text-gray-500">
+            App preferences & defaults
+          </p>
+        </div>
+
       </div>
 
       {/* CARD */}

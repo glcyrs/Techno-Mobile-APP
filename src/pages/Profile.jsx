@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getUser, logout } from "../lib/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { User, Shield, Settings, BarChart3, LogOut, Save } from "lucide-react";
+import { User, Shield, Settings, BarChart3, LogOut, Save, History } from "lucide-react";
 
 export default function Profile() {
   const user = getUser();
@@ -60,10 +60,10 @@ export default function Profile() {
         </span>
       </div>
 
-      {/* EDIT CARD */}
+      {/* EDIT PROFILE */}
       <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-4">
 
-        <p className="font-semibold">Edit Profile</p>
+        <p className="font-semibold text-sm">Edit Profile</p>
 
         <div>
           <p className="text-sm text-gray-600 mb-1">Full Name</p>
@@ -107,10 +107,19 @@ export default function Profile() {
 
         <Link
           to="/statistics"
-          className="flex items-center gap-3 p-4 hover:bg-gray-50"
+          className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b"
         >
           <BarChart3 className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium">Statistics & Analytics</span>
+          <span className="text-sm font-medium">Statistics</span>
+        </Link>
+
+        {/* HISTORY BUTTON (SAME STYLE) */}
+        <Link
+          to="/history"
+          className="flex items-center gap-3 p-4 hover:bg-gray-50"
+        >
+          <History className="h-4 w-4 text-gray-600" />
+          <span className="text-sm font-medium">History</span>
         </Link>
 
       </div>

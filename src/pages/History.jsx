@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import {
+  ArrowLeft,
   ArrowDownLeft,
   ArrowUpRight,
   RefreshCw,
   Undo2,
-  ScanLine,
-  Keyboard,
   ShoppingCart,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import moment from "moment";
 
@@ -20,11 +20,12 @@ const typeConfig = {
 };
 
 export default function History() {
+  const navigate = useNavigate();
+
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("all");
 
-  // ✅ MOCK DATA (NO BACKEND)
   useEffect(() => {
     const mockData = [
       {
@@ -69,13 +70,13 @@ export default function History() {
       : movements.filter((m) => m.type === filterType);
 
   const filterLabels = {
-  all: "All",
-  stock_in: "Stock In",
-  stock_out: "Stock Out",
-  sold: "Sold",
-  adjustment: "Adjustment",
-  return: "Return",
-};
+    all: "All",
+    stock_in: "Stock In",
+    stock_out: "Stock Out",
+    sold: "Sold",
+    adjustment: "Adjustment",
+    return: "Return",
+  };
 
   const grouped = filtered.reduce((acc, m) => {
     const date = moment(m.created_date).format("YYYY-MM-DD");
@@ -86,33 +87,43 @@ export default function History() {
 
   return (
     <div className="space-y-4 text-gray-900 p-4">
-      {/* HEADER */}
-      <div>
-        <h1 className="text-2xl font-bold">History</h1>
-        <p className="text-sm text-gray-500">Stock movement logs</p>
+
+      {/* HEADER WITH BACK BUTTON */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => navigate("/profile")}
+          className="p-2 rounded-xl bg-white border hover:bg-gray-50 transition"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        </button>
+
+        <div>
+          <h1 className="text-2xl font-bold">History</h1>
+          <p className="text-sm text-gray-500">Stock movement logs</p>
+        </div>
       </div>
 
-      {/* FILTER (simple UI no radix dependency) */}
+      {/* FILTER */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-  {["all", "stock_in", "stock_out", "sold", "adjustment", "return"].map((t) => (
-    <button
-      key={t}
-      onClick={() => setFilterType(t)}
-      className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition ${
-        filterType === t
-          ? "bg-gradient-to-r from-blue-500 to-blue-900 text-white"
-          : "bg-white/10 text-gray-900"
-      }`}
-    >
-      {filterLabels[t]}
-    </button>
-  ))}
-</div>
+        {["all", "stock_in", "stock_out", "sold", "adjustment", "return"].map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilterType(t)}
+            className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition ${
+              filterType === t
+                ? "bg-gradient-to-r from-blue-500 to-blue-900 text-white"
+                : "bg-white text-gray-900 border"
+            }`}
+          >
+            {filterLabels[t]}
+          </button>
+        ))}
+      </div>
 
       {/* CONTENT */}
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center text-white/60">Loading...</div>
+          <div className="text-center text-gray-500">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-gray-700 py-10">
             No movements yet
@@ -124,24 +135,26 @@ export default function History() {
                 {moment(date).format("MMM D, YYYY")}
               </p>
 
-              <div className="bg-white rounded-xl divide-y divide-gray-200 border border-blue-500">
+              <div className="bg-white rounded-xl divide-y border">
                 {items.map((m) => {
                   const config = typeConfig[m.type];
                   const Icon = config.icon;
 
                   return (
-                    <div key={m.id} className="flex items-center justify-between p-3">
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between p-3"
+                    >
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${config.color}`}>
                           <Icon className="w-5 h-5" />
                         </div>
 
                         <div>
-                          <p className="text-s">
+                          <p className="text-sm font-medium">
                             {m.product_name}
                           </p>
-
-                          <p className="text-sm text-gray-500">
+                          <p className="text-xs text-gray-500">
                             {config.label} •{" "}
                             {m.method === "qr_scan" ? "QR Scan" : "Manual"}
                           </p>
@@ -150,10 +163,10 @@ export default function History() {
 
                       <div className="text-right">
                         <p
-                          className={`text-s font-bold ${
+                          className={`text-sm font-bold ${
                             m.type === "stock_in" || m.type === "return"
-                              ? "text-green-400"
-                              : "text-red-400"
+                              ? "text-green-600"
+                              : "text-red-500"
                           }`}
                         >
                           {m.type === "stock_in" || m.type === "return"

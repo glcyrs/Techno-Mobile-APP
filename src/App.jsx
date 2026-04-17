@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
+import ProductDetail from "./pages/ProductDetail";
 import AddProduct from "./pages/AddProduct";
 import Scanner from "./pages/Scanner";
 import History from "./pages/History";
@@ -39,6 +40,7 @@ function App() {
           />
 
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/add-product" element={<AddProduct />} />
           <Route path="/scan" element={<Scanner />} />
           <Route path="/history" element={<History />} />
