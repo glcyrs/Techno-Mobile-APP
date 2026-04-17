@@ -48,7 +48,6 @@ export default function AddProduct() {
       return;
     }
 
-    // FRONTEND ONLY STORAGE
     const existing = JSON.parse(localStorage.getItem("products") || "[]");
 
     const newProduct = {
@@ -61,104 +60,181 @@ export default function AddProduct() {
     };
 
     existing.push(newProduct);
-    localStorage.setItem("products", JSON.stringify(existing));
+    localStorage.setItem("products", JSON.stringify(newProduct));
 
     alert("Product added successfully!");
     navigate("/inventory");
   };
 
   return (
-    <div className="min-h-screen bg-gray-100  text-gray-800 p-4 pb-5 space-y-4">
+    <div className="min-h-screen bg-gray-50 text-gray-800 p-4 pb-10">
 
       {/* HEADER */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-lg bg-white/30">
+      <div className="flex items-center gap-3 mb-5">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 rounded-xl bg-white border shadow-sm"
+        >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-lg font-semibold">Add Product</h1>
+
+        <div>
+          <h1 className="text-xl font-bold">Add Product</h1>
+          <p className="text-sm text-gray-500">Fill product details below</p>
+        </div>
       </div>
 
-      {/* FORM */}
-      <div className="space-y-3">
+      {/* MAIN CARD */}
+      <div className="bg-white rounded-2xl shadow-sm border p-5 space-y-5">
 
-        <Input label="Product Name *"  placeholder="e.g. Coca-Cola 1.5L" value={form.name} onChange={(v) => update("name", v)} />
+        {/* BASIC INFO */}
+        <Section title="Basic Information">
 
-      <div className="grid grid-cols-2 gap-2">
-          <Input label="SKU/Barcode"  placeholder="Optional" value={form.sku} onChange={(v) => update("sku", v)} />
-          <Input label="QR Code" value={form.qr_code} onChange={(v) => update("qr_code", v)} />
-        </div>
-
-        {/* QR */}
-        <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-          <p className="text-s text-gray-900 mb-2 ">QR Code</p>
-
-        <div className="flex justify-center">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${form.qr_code}`}
-            className="center w-28 h-28 rounded-lg "
+          <Input
+            label="Product Name *"
+            placeholder="e.g. Coca-Cola 1.5L"
+            value={form.name}
+            onChange={(v) => update("name", v)}
           />
 
-          <p className="text-xs mt-2 text-white/60">{form.qr_code}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="SKU"
+              placeholder="Optional"
+              value={form.sku}
+              onChange={(v) => update("sku", v)}
+            />
+
+            <Input
+              label="QR Code"
+              value={form.qr_code}
+              onChange={(v) => update("qr_code", v)}
+            />
+          </div>
+        </Section>
+
+        {/* QR PREVIEW */}
+        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border">
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${form.qr_code}`}
+            className="w-20 h-20"
+          />
+          <div>
+            <p className="text-sm font-medium">QR Preview</p>
+            <p className="text-xs text-gray-500">{form.qr_code}</p>
+          </div>
         </div>
-        </div>
 
-        {/* CATEGORY */}
-        <Select
-          label="Category"
-          value={form.category}
-          onChange={(v) => update("category", v)}
-          options={CATEGORIES}
-        />
+        {/* CATEGORY + UNIT */}
+        <Section title="Classification">
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Category"
+              value={form.category}
+              onChange={(v) => update("category", v)}
+              options={CATEGORIES}
+            />
 
-        <div className="grid grid-cols-2 gap-2">
-          <Input label="Qty *" type="number" value={form.quantity} onChange={(v) => update("quantity", v)} />
-          <Select label="Unit" value={form.unit} onChange={(v) => update("unit", v)} options={UNITS} />
-        </div>
+            <Select
+              label="Unit"
+              value={form.unit}
+              onChange={(v) => update("unit", v)}
+              options={UNITS}
+            />
+          </div>
+        </Section>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Input label="Cost ₱" type="number" value={form.cost_price} onChange={(v) => update("cost_price", v)} />
-          <Input label="Selling Price ₱ *" type="number" value={form.selling_price} onChange={(v) => update("selling_price", v)} />
-        </div>
+        {/* STOCK */}
+        <Section title="Stock & Pricing">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Quantity"
+              type="number"
+              value={form.quantity}
+              onChange={(v) => update("quantity", v)}
+            />
 
-        <div className="grid grid-cols-2 gap-2">
-          <Input label="Low Stock Alert *" type="number" value={form.low_stock_threshold} onChange={(v) => update("low_stock_threshold", v)} />
-          <Input label="Expiry Date *" type="date" value={form.expiry_date} onChange={(v) => update("expiry_date", v)} />
-        </div>
+            <Input
+              label="Low Stock Alert"
+              type="number"
+              value={form.low_stock_threshold}
+              onChange={(v) => update("low_stock_threshold", v)}
+            />
+          </div>
 
-        <Input label="Supplier"  placeholder="e.g. Optional" value={form.supplier} onChange={(v) => update("supplier", v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Cost Price"
+              type="number"
+              value={form.cost_price}
+              onChange={(v) => update("cost_price", v)}
+            />
 
-        <Input label="Location"  placeholder="e.g. Shelf A, Slot 1" value={form.location} onChange={(v) => update("location", v)} />
+            <Input
+              label="Selling Price *"
+              type="number"
+              value={form.selling_price}
+              onChange={(v) => update("selling_price", v)}
+            />
+          </div>
+        </Section>
 
-<div>
-  <p className="text-sm text-gray-500 mb-1">Product Image</p>
+        {/* EXTRA */}
+        <Section title="Additional Details">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Expiry Date"
+              type="date"
+              value={form.expiry_date}
+              onChange={(v) => update("expiry_date", v)}
+            />
 
-  <input className="bg-white/5 p-3 rounded-xl border border-white/10"
-    type="file"
-    accept="image/*"
-    onChange={(e) => {
-      const file = e.target.files[0];
+            <Input
+              label="Location"
+              placeholder="Shelf A1"
+              value={form.location}
+              onChange={(v) => update("location", v)}
+            />
+          </div>
 
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setForm({ ...form, image: reader.result });
-        };
-        reader.readAsDataURL(file);
-      }
-    }}
-  />
-  {form.image && (
-  <img
-    src={form.image}
-    className="w-24 h-24 object-cover rounded-xl mt-2"
-  />
-)}
-</div>
+          <Input
+            label="Supplier"
+            placeholder="Optional"
+            value={form.supplier}
+            onChange={(v) => update("supplier", v)}
+          />
+        </Section>
 
-        {/* BUTTON */}
+        {/* IMAGE */}
+        <Section title="Product Image">
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full p-3 border rounded-xl bg-gray-50"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  setForm({ ...form, image: reader.result });
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+
+          {form.image && (
+            <img
+              src={form.image}
+              className="w-24 h-24 mt-3 rounded-xl object-cover border"
+            />
+          )}
+        </Section>
+
+        {/* SAVE BUTTON */}
         <button
           onClick={handleSave}
-          className="w-full text-white bg-gradient-to-r from-blue-500 to-blue-900 hover:bg-blue-600 transition p-3 rounded-xl font-semibold"
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white p-3 rounded-xl font-semibold shadow-md hover:opacity-90"
         >
           Save Product
         </button>
@@ -168,31 +244,40 @@ export default function AddProduct() {
   );
 }
 
-/* INPUT COMPONENT */
+/* ------------------ UI COMPONENTS ------------------ */
+
+function Section({ title, children }) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-sm font-semibold text-gray-600">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
 function Input({ label, value, onChange, type = "text", placeholder }) {
   return (
     <div>
-      <p className="text-sm text-gray-800 mb-2">{label}</p>
+      <p className="text-sm text-gray-600 mb-1">{label}</p>
       <input
         type={type}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 rounded-xl bg-white/900 border border-gray-300 outline-none text-gray-800"
+        className="w-full p-3 rounded-xl border bg-white outline-none focus:ring-2 focus:ring-blue-400"
       />
     </div>
   );
 }
 
-/* SELECT COMPONENT */
 function Select({ label, value, onChange, options }) {
   return (
     <div>
-      <p className="text-sm text-gray-800 mb-2">{label}</p>
+      <p className="text-sm text-gray-600 mb-1">{label}</p>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 rounded-xl bg-white/900 border border-gray-300 text-gray-400"
+        className="w-full p-3 rounded-xl border bg-white"
       >
         <option value="">Select</option>
         {options.map((o) => (

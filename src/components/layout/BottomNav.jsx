@@ -5,14 +5,15 @@ import {
   ScanLine,
   Clock,
   Bell,
+  User,
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/inventory", icon: Package, label: "Inventory" },
   { path: "/scan", icon: ScanLine, label: "Scan" },
-  { path: "/history", icon: Clock, label: "History" },
   { path: "/alerts", icon: Bell, label: "Alerts" },
+  { path: "/profile", icon: User, label: "Profile" },
 ];
 
 export default function BottomNav() {

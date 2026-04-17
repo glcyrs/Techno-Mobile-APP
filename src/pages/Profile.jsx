@@ -1,0 +1,132 @@
+import { useState } from "react";
+import { getUser, logout } from "../lib/auth";
+import { useNavigate, Link } from "react-router-dom";
+import { User, Shield, Settings, BarChart3, LogOut, Save } from "lucide-react";
+
+export default function Profile() {
+  const user = getUser();
+  const navigate = useNavigate();
+
+  const [fullName, setFullName] = useState(user?.name || "");
+  const [saving, setSaving] = useState(false);
+
+  const initials = (user?.name || user?.email || "U")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handleSave = () => {
+    setSaving(true);
+
+    const updated = {
+      ...user,
+      name: fullName,
+    };
+
+    localStorage.setItem("user", JSON.stringify(updated));
+
+    setTimeout(() => {
+      setSaving(false);
+    }, 500);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 space-y-5 text-gray-800">
+
+      {/* HEADER */}
+      <div>
+        <h1 className="text-xl font-bold">Profile</h1>
+        <p className="text-sm text-gray-500">Manage your account details</p>
+      </div>
+
+      {/* PROFILE CARD */}
+      <div className="bg-white border rounded-2xl shadow-sm p-5 flex flex-col items-center text-center">
+
+        <div className="w-20 h-20 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
+          {initials}
+        </div>
+
+        <p className="mt-3 font-semibold text-lg">
+          {user?.name || "User"}
+        </p>
+
+        <p className="text-sm text-gray-500">{user?.email}</p>
+
+        <span className="mt-2 inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full">
+          <Shield className="h-3 w-3" />
+          Admin
+        </span>
+      </div>
+
+      {/* EDIT CARD */}
+      <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-4">
+
+        <p className="font-semibold">Edit Profile</p>
+
+        <div>
+          <p className="text-sm text-gray-600 mb-1">Full Name</p>
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400 outline-none"
+            placeholder="Enter your name"
+          />
+        </div>
+
+        <div>
+          <p className="text-sm text-gray-600 mb-1">Email</p>
+          <input
+            value={user?.email || ""}
+            disabled
+            className="w-full p-3 border rounded-xl bg-gray-100 text-gray-500"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-blue-600 text-white p-3 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+
+        <Link
+          to="/settings"
+          className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b"
+        >
+          <Settings className="h-4 w-4 text-gray-600" />
+          <span className="text-sm font-medium">Settings</span>
+        </Link>
+
+        <Link
+          to="/statistics"
+          className="flex items-center gap-3 p-4 hover:bg-gray-50"
+        >
+          <BarChart3 className="h-4 w-4 text-gray-600" />
+          <span className="text-sm font-medium">Statistics & Analytics</span>
+        </Link>
+
+      </div>
+
+      {/* LOGOUT */}
+      <button
+        onClick={() => {
+          logout();
+          navigate("/login");
+        }}
+        className="w-full bg-red-500 text-white p-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-600"
+      >
+        <LogOut className="h-4 w-4" />
+        Logout
+      </button>
+
+    </div>
+  );
+}
