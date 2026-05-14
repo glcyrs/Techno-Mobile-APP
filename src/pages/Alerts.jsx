@@ -189,7 +189,7 @@ useEffect(() => {
             {expired.length === 0 &&
               expiringSoon.length === 0 &&
               expiringLater.length === 0 && (
-              <Empty text="No expiry alerts 🎉" />
+              <Empty text="No expiry alerts" />
             )}
           </>
         )}
