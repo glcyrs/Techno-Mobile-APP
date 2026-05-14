@@ -1,14 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getUser, logout } from "../lib/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { User, Shield, Settings, BarChart3, LogOut, Save, History } from "lucide-react";
+import {
+  Shield,
+  Settings,
+  BarChart3,
+  LogOut,
+  History,
+  CreditCard,
+} from "lucide-react";
 
 export default function Profile() {
-  const user = getUser();
+  const user = JSON.parse(localStorage.getItem("currentUser") || "null");
   const navigate = useNavigate();
 
-  const [fullName, setFullName] = useState(user?.name || "");
-  const [saving, setSaving] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+
+  useEffect(() => {
+    const sub = JSON.parse(localStorage.getItem("subscription"));
+
+    if (sub) {
+      const today = new Date();
+      const expiry = new Date(sub.expiryDate);
+
+      if (expiry < today) {
+        sub.status = "Expired";
+        localStorage.setItem("subscription", JSON.stringify(sub));
+      }
+
+      setSubscription(sub);
+    }
+  }, []);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "N/A";
+
+    const date = new Date(dateStr);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}/${month}/${day}`;
+  };
 
   const initials = (user?.name || user?.email || "U")
     .split(" ")
@@ -17,109 +51,145 @@ export default function Profile() {
     .toUpperCase()
     .slice(0, 2);
 
-  const handleSave = () => {
-    setSaving(true);
-
-    const updated = {
-      ...user,
-      name: fullName,
-    };
-
-    localStorage.setItem("user", JSON.stringify(updated));
-
-    setTimeout(() => {
-      setSaving(false);
-    }, 500);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4 space-y-5 text-gray-800">
+    <div className="min-h-screen bg-gray-100 p-4 space-y-5">
 
-      {/* HEADER */}
+      {/* TITLE */}
       <div>
-        <h1 className="text-xl font-bold">Profile</h1>
-        <p className="text-sm text-gray-500">Manage your account details</p>
+        <h1 className="text-2xl font-bold text-gray-800">Profile</h1>
+        <p className="text-sm text-gray-500">Account overview</p>
       </div>
 
       {/* PROFILE CARD */}
-      <div className="bg-white border rounded-2xl shadow-sm p-5 flex flex-col items-center text-center">
+      <div className="bg-white rounded-2xl shadow-md p-5 space-y-4">
 
-        <div className="w-20 h-20 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
-          {initials}
+        {/* HEADER ROW */}
+        <div className="flex items-start justify-between">
+
+          {/* LEFT: USER */}
+          <div className="flex items-center gap-4">
+
+            <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+              {initials}
+            </div>
+
+            <div>
+              <p className="text-lg font-semibold">
+                 {user?.name || "Unknown User"}
+              </p>
+
+              <p className="text-sm text-gray-500">
+                 {user?.email || "No email"}
+              </p>
+            </div>
+
+          </div>
+
+          {/* RIGHT: ADMIN BADGE (MOVED HERE) */}
+          <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full">
+            <Shield className="h-3 w-3" />
+            Admin
+          </div>
+
         </div>
 
-        <p className="mt-3 font-semibold text-lg">
-          {user?.name || "User"}
-        </p>
+        {/* SUBSCRIPTION CARD (IMPROVED LAYOUT) */}
+        <div className="bg-gray-50 rounded-xl p-4 space-y-3">
 
-        <p className="text-sm text-gray-500">{user?.email}</p>
+          {/* HEADER */}
+          <div className="flex items-center justify-between">
 
-        <span className="mt-2 inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full">
-          <Shield className="h-3 w-3" />
-          Admin
-        </span>
-      </div>
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-blue-600" />
+              <p className="font-semibold text-sm">Subscription</p>
+            </div>
 
-      {/* EDIT PROFILE */}
-      <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-4">
+            {subscription && (
+              <span
+                className={`text-xs px-3 py-1 rounded-full font-medium ${
+                  subscription.status === "Active"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-red-100 text-red-600"
+                }`}
+              >
+                {subscription.status}
+              </span>
+            )}
 
-        <p className="font-semibold text-sm">Edit Profile</p>
+          </div>
 
-        <div>
-          <p className="text-sm text-gray-600 mb-1">Full Name</p>
-          <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400 outline-none"
-            placeholder="Enter your name"
-          />
+          {/* GRID INFO */}
+          {subscription ? (
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+
+              <div>
+                <p className="text-xs text-gray-400">Plan</p>
+                <p className="font-medium text-blue-600">
+                  {subscription.plan}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400">Payment</p>
+                <p className="font-medium">
+                  {subscription.paymentMethod}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400">Start</p>
+                <p className="font-medium">
+                  {formatDate(subscription.startDate)}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400">Expires</p>
+                <p className="font-medium">
+                  {formatDate(subscription.expiryDate)}
+                </p>
+              </div>
+
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              No subscription found
+            </p>
+          )}
+
+          {/* FOOT NOTE */}
+          {subscription && (
+            <p className="text-xs text-gray-400 pt-2">
+              {subscription.isTrial
+                ? "Free Trial Access (Limited Features)"
+                : "Premium Access (Full System Enabled)"}
+            </p>
+          )}
+
         </div>
-
-        <div>
-          <p className="text-sm text-gray-600 mb-1">Email</p>
-          <input
-            value={user?.email || ""}
-            disabled
-            className="w-full p-3 border rounded-xl bg-gray-100 text-gray-500"
-          />
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full bg-blue-600 text-white p-3 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
       </div>
 
       {/* QUICK ACTIONS */}
-      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
 
-        <Link
-          to="/settings"
-          className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b"
-        >
+        <Link className="flex items-center gap-3 p-4 border-b hover:bg-gray-50" to="/subscription">
+          <CreditCard className="h-4 w-4 text-blue-600" />
+          Subscription
+        </Link>
+
+        <Link className="flex items-center gap-3 p-4 border-b hover:bg-gray-50" to="/settings">
           <Settings className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium">Settings</span>
+          Settings
         </Link>
 
-        <Link
-          to="/statistics"
-          className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b"
-        >
+        <Link className="flex items-center gap-3 p-4 border-b hover:bg-gray-50" to="/statistics">
           <BarChart3 className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium">Statistics</span>
+          Statistics
         </Link>
 
-        {/* HISTORY BUTTON (SAME STYLE) */}
-        <Link
-          to="/history"
-          className="flex items-center gap-3 p-4 hover:bg-gray-50"
-        >
+        <Link className="flex items-center gap-3 p-4 hover:bg-gray-50" to="/history">
           <History className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium">History</span>
+          History
         </Link>
 
       </div>
@@ -130,7 +200,7 @@ export default function Profile() {
           logout();
           navigate("/login");
         }}
-        className="w-full bg-red-500 text-white p-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-600"
+        className="w-full bg-red-500 text-white p-3 rounded-xl font-medium flex items-center justify-center gap-2"
       >
         <LogOut className="h-4 w-4" />
         Logout

@@ -1,16 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Package } from "lucide-react";
 import { addDays, isAfter, isBefore } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 
 export default function Alerts() {
-  const [tab, setTab] = useState("low-stock");
+  const [searchParams] = useSearchParams();
 
-  // MOCK DATA
-  const products = [
-    { id: 1, name: "Coke", category: "Beverages", quantity: 0, unit: "pcs", low_stock_threshold: 5, expiry_date: "2026-04-10" },
-    { id: 2, name: "Rice", category: "Grains", quantity: 2, unit: "kg", low_stock_threshold: 5, expiry_date: "2026-04-20" },
-    { id: 3, name: "Milk", category: "Dairy", quantity: 10, unit: "L", low_stock_threshold: 5, expiry_date: "2026-05-01" },
-  ];
+const [tab, setTab] = useState(
+  searchParams.get("tab") || "low-stock"
+);
+
+useEffect(() => {
+  const tabFromUrl = searchParams.get("tab");
+  if (tabFromUrl) {
+    setTab(tabFromUrl);
+  }
+}, [searchParams]);
+
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+  const loadProducts = () => {
+    setProducts(JSON.parse(localStorage.getItem("products") || "[]"));
+  };
+
+  loadProducts(); // initial load
+
+  const handleUpdate = () => {
+    loadProducts();
+  };
+
+  window.addEventListener("productsUpdated", handleUpdate);
+
+  return () => {
+    window.removeEventListener("productsUpdated", handleUpdate);
+  };
+}, []);
 
   const now = new Date();
   const sevenDays = addDays(now, 7);
@@ -22,18 +47,31 @@ export default function Alerts() {
 
   // EXPIRY LOGIC
   const expiringSoon = products.filter(p => {
-    const exp = new Date(p.expiry_date);
-    return isAfter(exp, now) && isBefore(exp, sevenDays);
-  });
+  if (!p.expiration_date) return false;
 
-  const expiringLater = products.filter(p => {
-    const exp = new Date(p.expiry_date);
-    return isAfter(exp, sevenDays) && isBefore(exp, thirtyDays);
-  });
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return isAfter(exp, now) && isBefore(exp, sevenDays);
+});
+
+ const expiringLater = products.filter(p => {
+  if (!p.expiration_date) return false;
+
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return isAfter(exp, sevenDays) && isBefore(exp, thirtyDays);
+});
 
   const expired = products.filter(p => {
-    return isBefore(new Date(p.expiry_date), now);
-  });
+  if (!p.expiration_date) return false;
+
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return isBefore(exp, now);
+});
 
   const tabs = [
     { id: "low-stock", label: "Low Stock", count: lowStock.length + outStock.length },

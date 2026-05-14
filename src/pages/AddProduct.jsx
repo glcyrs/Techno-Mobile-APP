@@ -33,7 +33,7 @@ export default function AddProduct() {
     cost_price: 0,
     selling_price: 0,
     low_stock_threshold: 5,
-    expiry_date: "",
+    expiration_date: "",
     supplier: "",
     location: "",
   });
@@ -42,29 +42,46 @@ export default function AddProduct() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
-    if (!form.name || !form.category || !form.selling_price) {
-      alert("Please fill required fields");
-      return;
-    }
+const handleSave = () => {
+  if (!form.name || !form.category || !form.selling_price) {
+    alert("Please fill required fields");
+    return;
+  }
 
-    const existing = JSON.parse(localStorage.getItem("products") || "[]");
+  const existing = JSON.parse(localStorage.getItem("products") || "[]");
 
-    const newProduct = {
-      ...form,
-      id: Date.now(),
-      quantity: Number(form.quantity),
-      cost_price: Number(form.cost_price),
-      selling_price: Number(form.selling_price),
-      low_stock_threshold: Number(form.low_stock_threshold),
-    };
-
-    existing.push(newProduct);
-    localStorage.setItem("products", JSON.stringify(newProduct));
-
-    alert("Product added successfully!");
-    navigate("/inventory");
+  const newProduct = {
+    ...form,
+    id: Date.now().toString(),
+    quantity: Number(form.quantity),
+    cost_price: Number(form.cost_price),
+    selling_price: Number(form.selling_price),
+    low_stock_threshold: Number(form.low_stock_threshold),
+    isPerishable: !!form.expiration_date, 
+    expiration_date: form.expiration_date || null,
   };
+
+  const updatedProducts = [...existing, newProduct];
+  localStorage.setItem("products", JSON.stringify(updatedProducts));
+
+  //  FIX: CREATE MOVEMENTS PROPERLY
+  const logs = JSON.parse(localStorage.getItem("movements") || "[]");
+
+  logs.unshift({
+    id: Date.now(),
+    action: `Added ${newProduct.name}`,
+    date: new Date().toLocaleString(),
+  });
+
+  localStorage.setItem("movements", JSON.stringify(logs));
+
+  // notify dashboard + inventory
+  window.dispatchEvent(new Event("productsUpdated"));
+  window.dispatchEvent(new Event("movementsUpdated"));
+
+  alert("Product added successfully!");
+  navigate("/inventory");
+};
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 p-4 pb-10">
@@ -183,10 +200,10 @@ export default function AddProduct() {
         <Section title="Additional Details">
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Expiry Date"
+              label="Expiration Date"
               type="date"
-              value={form.expiry_date}
-              onChange={(v) => update("expiry_date", v)}
+              value={form.expiration_date}
+              onChange={(v) => update("expiration_date", v)}
             />
 
             <Input

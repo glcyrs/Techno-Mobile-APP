@@ -1,30 +1,23 @@
 import { useState, useEffect } from "react";
-import { Download } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import moment from "moment";
 import {
+  Download,
   ArrowLeft,
   Edit,
   Trash2,
-  ArrowDownLeft,
-  ArrowUpRight,
   Package,
   Calendar,
   MapPin,
   Truck,
-  QrCode,
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ShoppingCart,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import {
   Dialog,
   DialogContent,
@@ -45,75 +38,74 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { cn } from "@/lib/utils";
-import moment from "moment";
 
-/* ---------------- MOCK DATA ---------------- */
-
-const MOCK_PRODUCTS = [
-  {
-    id: "1",
-    name: "Coca Cola 1.5L",
-    sku: "COKE-001",
-    category: "Beverages",
-    unit: "bottle",
-    method: "qr_scan",
-    quantity: 12,
-    selling_price: 65,
-    cost_price: 50,
-    low_stock_threshold: 5,
-    expiry_date: "2026-05-10",
-    supplier: "Local Supplier",
-    location: "Shelf A",
-    qr_code: "COKE001",
-    qr_scan_count: 15,
-  },
-  {
-    id: "2",
-    name: "Instant Noodles",
-    sku: "NOODLE-002",
-    category: "Snacks",
-    unit: "pack",
-    method: "manual",
-    quantity: 3,
-    selling_price: 15,
-    cost_price: 10,
-    low_stock_threshold: 5,
-    expiry_date: "2026-04-20",
-    supplier: "Food Corp",
-    location: "Shelf B",
-    qr_code: "NOODLE002",
-    qr_scan_count: 15,
-  },
-];
-
-const MOCK_MOVEMENTS = {
-  "1": [
-    { id: "m1", type: "stock_in", quantity: 10, created_date: "2026-04-10T10:00:00Z" },
-    { id: "m2", type: "sold", quantity: 2, created_date: "2026-04-11T12:00:00Z" },
-  ],
-  "2": [
-    { id: "m3", type: "stock_in", quantity: 5, created_date: "2026-04-09T09:00:00Z" },
-    { id: "m4", type: "stock_out", quantity: 2, created_date: "2026-04-10T15:00:00Z" },
-  ],
+/* ---------------- SAFE STORAGE ---------------- */
+const getLS = (key, fallback) => {
+  try {
+    const data = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(data) ? data : fallback;
+  } catch {
+    return fallback;
+  }
 };
 
-const CATEGORIES = [
-  "Beverages",
-  "Snacks",
-  "Canned Goods",
-  "Condiments",
-  "Personal Care",
-  "Household",
-  "Frozen",
-  "Fresh Produce",
-  "Dairy",
-  "Bread & Bakery",
-  "Rice & Grains",
-  "Other",
-];
+const setLS = (key, value) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
 
-const UNITS = ["pcs", "kg", "g", "L", "mL", "pack", "box", "bottle", "can", "sachet", "dozen"];
+/* ---------------- QR DOWNLOAD (FIXED) ---------------- */
+const downloadQr = (product) => {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(
+    product.qr_code
+  )}`;
 
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = qrUrl;
+
+  img.onload = () => {
+    // canvas size
+    canvas.width = 500;
+    canvas.height = 650;
+
+    // background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ===== TITLE (CENTER) =====
+    ctx.fillStyle = "#111";
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(product.name, canvas.width / 2, 60);
+
+    // ===== QR IMAGE (CENTER) =====
+    ctx.drawImage(img, 100, 100, 300, 300);
+
+    // ===== QR ID (CENTER) =====
+    ctx.fillStyle = "#666";
+    ctx.font = "16px Arial";
+    ctx.fillText(
+      `QR ID: ${product.qr_code}`,
+      canvas.width / 2,
+      450
+    );
+
+    // optional small footer
+    ctx.font = "12px Arial";
+    ctx.fillText("Scan this QR Code to view product", canvas.width / 2, 480);
+
+    // download
+    const link = document.createElement("a");
+    link.download = `${product.name}-QR.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+};
+
+/* ---------------- COMPONENT ---------------- */
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -125,66 +117,107 @@ export default function ProductDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
+  
+  const [toast, setToast] = useState({ show: false, message: "" });
+  const showToast = (message) => {
+  setToast({ show: true, message });
 
-  /* ---------------- LOAD MOCK ---------------- */
+  setTimeout(() => {
+    setToast({ show: false, message: "" });
+  }, 2500);
+};
+
+  /* ---------------- LOAD ---------------- */
   useEffect(() => {
-    const p = MOCK_PRODUCTS.find((x) => x.id === id);
+    const products = getLS("products", []);
+    const movementsAll = getLS("movements", []);
 
-    setProduct(p || null);
-    setEditForm(p || {});
-    setMovements(MOCK_MOVEMENTS[id] || []);
+    const found = products.find((p) => p.id?.toString() === id);
+
+    if (!found) {
+      setProduct(null);
+      setLoading(false);
+      return;
+    }
+
+    setProduct(found);
+    setEditForm(found);
+
+    const filtered = movementsAll.filter((m) => {
+  return String(m.product_id) === String(id);
+});
+
+    setMovements(filtered);
     setLoading(false);
   }, [id]);
 
-  /* ---------------- EDIT ---------------- */
-  const handleEdit = () => {
-    setProduct(editForm);
-    setEditOpen(false);
-  };
+  /* ---------------- SAVE EDIT ---------------- */
+  const handleSave = () => {
+  const products = getLS("products", []);
+
+  const updated = products.map((p) =>
+    p.id?.toString() === id
+      ? {
+          ...p,
+          ...editForm,
+          qr_code: p.qr_code, //  QR FIXED (cannot change)
+        }
+      : p
+  );
+
+  setLS("products", updated);
+  setProduct({ ...product, ...editForm });
+
+  setEditOpen(false);
+  showToast("Product updated successfully");
+};
 
   /* ---------------- DELETE ---------------- */
   const handleDelete = () => {
-    setProduct(null);
+    const products = getLS("products", []);
+    const movementsAll = getLS("movements", []);
+
+    setLS(
+      "products",
+      products.filter((p) => p.id?.toString() !== id)
+    );
+
+    setLS(
+      "movements",
+      movementsAll.filter((m) => m.product_id?.toString() !== id)
+    );
+
     setDeleteOpen(false);
+
     navigate("/inventory");
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
-  if (!product) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Product not found</p>
-        <Button onClick={() => navigate("/inventory")} className="mt-3 rounded-xl">
-          Back
-        </Button>
-      </div>
-    );
-  }
+  if (loading) return <p className="p-5">Loading...</p>;
+  if (!product) return <p className="p-5">Product not found</p>;
 
-  const isLow = product.quantity <= (product.low_stock_threshold || 5);
+  const isLow =
+    product.quantity <= (product.low_stock_threshold || 5);
+
   const isExpired =
-    product.expiry_date && new Date(product.expiry_date) < new Date();
+    product.expiration_date &&
+    new Date(product.expiration_date) < new Date();
 
+  /* ---------------- UI ---------------- */
   return (
     <div className="h-screen overflow-y-auto bg-gray-100 pb-20 space-y-5">
+
       {/* HEADER */}
       <div className="px-5 pt-6 flex justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft />
         </Button>
 
-        <div className="flex gap-2 bg-slate-100 bg-secondary p-1 rounded-xl">
-          <Button variant="outline" size="icon" onClick={() => setEditOpen(true)}>
+        <div className="flex gap-2">
+          <Button onClick={() => setEditOpen(true)} variant="outline" size="icon">
             <Edit />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setDeleteOpen(true)}>
+          <Button onClick={() => setDeleteOpen(true)} variant="outline" size="icon">
             <Trash2 />
           </Button>
         </div>
@@ -192,104 +225,87 @@ export default function ProductDetail() {
 
       {/* PRODUCT CARD */}
       <div className="px-5">
-        <div className="bg-white bg-card rounded-2xl border p-5">
-          <div className="flex gap-4">
+        <div className="bg-white rounded-2xl border p-5">
 
-            <div className="w-16 h-16 bg-gray-100 bg-secondary rounded-xl flex items-center justify-center">
+          {/* HEADER INFO */}
+          <div className="flex gap-4">
+            <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
               {product.image ? (
-                  <img
-                  src={product.image}
-                 alt="product"
-                className="w-full h-full object-cover"
-                 />
-                 ) : (
-              <Package className="w-6 h-6 text-gray-400"/>
+                <img src={product.image} className="w-full h-full object-cover" />
+              ) : (
+                <Package />
               )}
-            </div> 
+            </div>
 
             <div>
-              <h1 className="text-xl font-bold">{product.name}</h1>
-              <p className="text-gray-700 text-sm text-muted-foreground">{product.category}</p>
-              <p className="text-gray-500 text-xs text-muted-foreground">{product.sku}</p>
+              <h1 className="font-bold text-xl">{product.name}</h1>
+              <p className="text-sm text-gray-500">{product.category}</p>
+              <p className="text-xs text-gray-400">SKU: {product.sku}</p>
             </div>
           </div>
 
           {/* STATS */}
           <div className="grid grid-cols-3 gap-3 mt-5">
-            <div className="bg-slate-100 bg-secondary p-3 rounded-xl text-center">
-              <p className={cn("text-xl font-bold", isLow && "text-amber-600")}>
+            <div className="bg-gray-100 p-3 rounded-xl text-center">
+              <p className={cn("text-xl font-bold", isLow && "text-red-500")}>
                 {product.quantity}
               </p>
-              <p className="text-xs text-gray-500">Stock</p>
+              <p className="text-xs">Stock</p>
             </div>
 
-            <div className="bg-slate-100 bg-secondary p-3 rounded-xl text-center">
+            <div className="bg-gray-100 p-3 rounded-xl text-center">
               <p className="text-xl font-bold">₱{product.selling_price}</p>
-              <p className="text-xs text-gray-500">Price</p>
+              <p className="text-xs">Price</p>
             </div>
 
-            <div className="bg-slate-100 bg-secondary p-3 rounded-xl text-center">
+            <div className="bg-gray-100 p-3 rounded-xl text-center">
               <p className="text-xl font-bold">
                 ₱{product.quantity * product.selling_price}
               </p>
-              <p className="text-xs text-gray-500">Value</p>
+              <p className="text-xs">Value</p>
             </div>
           </div>
 
-          {/* INFO */}
-          <div className="mt-4 space-y-2 text-sm">
-            {product.expiry_date && (
-              <p>
-                <Calendar className="inline w-4 h-4 mr-1" />
-                <span className="text-xs">Expiry Date: {product.expiry_date} {isExpired && "(Expired)"}</span>
-              </p>
-            )}
-            {product.location && (
-              <p>
-                <MapPin className="inline w-4 h-4 mr-1" />
-                <span className="text-xs">Location: {product.location}</span>
-              </p>
-            )}
-            {product.supplier && (
-              <p>
-                <Truck className="inline w-4 h-4 mr-1" />
-                <span className="text-xs">Supplier: {product.supplier}</span>
-              </p>
-            )}
-            <hr className="my-3 border-gray-300" />
-            {product.qr_code && (
-        <div className="mt-3 text-center">
-
-        {/* label */}
-        <p className="text-xs text-gray-500 mb-2">
-         Scan this QR to find the product
-          </p>
-
-        {/* QR IMAGE */}
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${product.qr_code}`}
-          className="w-28 h-28 rounded-lg mx-auto"
-          />
-
-          {/* SKU */}
-          <p className="text-xs text-gray-400 mt-2">
-            {product.sku || product.qr_code}
+          {/* DETAILS (FIXED COMPLETE) */}
+          <div className="mt-4 text-sm space-y-2">
+            <p><Calendar className="inline w-4 h-4 mr-1" />
+              Expiration: {product.expiration_date || "N/A"}
+              {isExpired && " (Expired)"}
             </p>
 
-          {/* DOWNLOAD BUTTON */}
-            <Button
-             variant="outline"
-              size="sm"
-            className="mx-auto rounded-xl flex items-center gap-1.5 mt-2"
-            onClick={() => downloadQr(product.qr_code, product.name)}
-              >
-            <Download className="flex items-center w-4 h-4" />
-            Download QR
-              </Button>
+            <p><MapPin className="inline w-4 h-4 mr-1" />
+              Location: {product.location || "N/A"}
+            </p>
 
+            <p><Truck className="inline w-4 h-4 mr-1" />
+              Supplier: {product.supplier || "N/A"}
+            </p>
           </div>
+
+          {/* QR (FIXED DOWNLOAD) */}
+          {product.qr_code && (
+            <div className="mt-6 text-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                  product.qr_code
+                )}`}
+                className="mx-auto border rounded-lg"
+              />
+
+              <p className="text-xs mt-2 text-gray-500">
+                QR ID: {product.qr_code}
+              </p>
+
+              <Button
+                className="mt-2"
+                variant="outline"
+                onClick={() => downloadQr(product)}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Download QR
+              </Button>
+            </div>
           )}
-          </div>
         </div>
       </div>
 
@@ -297,257 +313,354 @@ export default function ProductDetail() {
       <div className="px-5">
         <h2 className="font-semibold mb-2">Recent Movements</h2>
 
-            <div className="bg-white rounded-2xl border divide-y">
-             {movements.map((m) => {
-      const isPositive =
-        m.type === "stock_in" || m.type === "return";
+        <div className="bg-white rounded-2xl border divide-y">
+          {movements.length === 0 ? (
+            <p className="p-4 text-gray-400 text-sm">No movements yet</p>
+          ) : (
+          movements.map((m) => (
+  <div key={m?.id || Math.random()} className="flex justify-between items-center p-3">
 
-      return (
-        <div key={m.id} className="flex items-center justify-between p-3">
+    <div>
+      <p className="text-sm font-medium mt-1 flex items-center gap-1">
+        {m?.type === "stock_in" && (
+          <>
+            <ArrowDownLeft className="w-3 h-3 text-green-600" />
+            <span className="text-green-600">Stock In</span>
+          </>
+        )}
 
-          {/* LEFT: ARROW */}
-          <div>
-            {isPositive ? (
-              <ArrowDownLeft className="h-4 w-4 text-green-600" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4 text-red-600" />
-            )}
-          </div>
+        {m?.type === "stock_out" && (
+          <>
+            <ArrowUpRight className="w-3 h-3 text-red-500" />
+            <span className="text-red-500">Stock Out</span>
+          </>
+        )}
 
-          {/* MIDDLE: DATE */}
-          <div className="flex-1 ml-3">
-            <p className="text-xs text-gray-600">
-              {moment(m.created_date).format("MMM D, h:mm A")}
-            </p>
-          </div>
+        {m?.type === "sold" && (
+          <>
+            <ShoppingCart className="w-3 h-3 text-blue-600" />
+            <span className="text-blue-600">Sold</span>
+          </>
+        )}
+        
+      </p>
 
-          {/* RIGHT: QTY */}
-          <div className="flex flex-col items-end">
-            <p
-              className="text-sm font-semibold"
-              style={{
-                color: isPositive ? "#16a34a" : "#ef4444",
-              }}
-            >
-              {isPositive ? "+" : "-"}
-              {m.quantity || 1}
-            </p>
-          </div>
+      <p className="text-xs text-gray-500">
+        {m?.timestamp
+          ? moment(Number(m.timestamp)).format("MMM D, h:mm A")
+          : "No date"}
+      </p>
 
-        </div>
-      );
-            })}
-          </div>
-            </div>
+    </div>
 
-         {/* EDIT MODAL */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="text-gray-800 bg-white max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
-          </DialogHeader>
+    <p className={`font-semibold flex items-center gap-1 ${
+      m?.type === "stock_in" ? "text-green-600" : "text-red-500"
+    }`}>
+      {m?.type === "stock_in" ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+      {m?.type === "stock_in" ? "+" : "-"}
+      {m?.quantity || 0}
+    </p>
 
-          {/* FORM CONTAINER */}
-            <div className="space-y-3 mt-2">
-       {/* INPUTS */}
-       <div className="text-sm text-gray-500">Name</div>
-      <Input  className="bg-slate-200 border-slate-300"
-        label="Product Name"
-        value={editForm.name || ""}
-        onChange={(e) =>
-          setEditForm({ ...editForm, name: e.target.value })
-        }
-      />
-      
-      <div className="grid grid-cols-2 gap-2">
-      {/* QUANTITY */}
-       <div>
-        <p className="text-sm text-gray-500 mb-1">SKU/Barcode</p>
-        <Input
-      className="bg-slate-200 border-slate-300"
-      value={editForm.sku || ""}
-      onChange={(e) =>
-        setEditForm({ ...editForm, sku: e.target.value })
-      }
-          />
-         </div>
-         {/* QR CODE */}
-        <div>
-            <p className="text-sm text-gray-500 mb-1">QR Code</p>
-             <Input
-                 className="bg-slate-200 border-slate-300"
-                value={editForm.qr_code || ""}
-              onChange={(e) =>
-                 setEditForm({ ...editForm, qr_code: e.target.value })
-                 }
-              />
-             </div>
-          </div>
-       
-       <div className="text-sm text-gray-500">Category</div>
-      <Input  className="bg-slate-200 border-slate-300"
-        label="Category"
-        value={editForm.category || ""}
-        onChange={(e) =>
-          setEditForm({ ...editForm, category: e.target.value })
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-2">
-      {/* quantity */}
-       <div>
-        <p className="text-sm text-gray-500 mb-1">Quantity</p>
-        <Input
-      className="bg-slate-200 border-slate-300"
-      value={editForm.quantity || ""}
-      onChange={(e) =>
-        setEditForm({ ...editForm, quantity: e.target.value })
-      }
-            />
-            </div>
-         {/* unit */}
-        <div>
-            <p className="text-sm text-gray-500 mb-1">Unit</p>
-             <Input
-                 className="bg-slate-200 border-slate-300"
-                value={editForm.unit || ""}
-              onChange={(e) =>
-                 setEditForm({ ...editForm, unit: e.target.value })
-                 }
-              />
-             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-      {/* cost */}
-       <div>
-        <p className="text-sm text-gray-500 mb-1">Cost Price</p>
-        <Input
-      className="bg-slate-200 border-slate-300"
-      value={editForm.cost_price || ""}
-      onChange={(e) =>
-        setEditForm({ ...editForm, cost_price: e.target.value })
-      }
-          />
-          </div>
-         {/* Selling Price */}
-        <div>
-            <p className="text-sm text-gray-500 mb-1">Selling Price</p>
-             <Input
-                 className="bg-slate-200 border-slate-300"
-                value={editForm.selling_price || ""}
-              onChange={(e) =>
-                 setEditForm({ ...editForm, selling_price: e.target.value })
-                 }
-              />
-             </div>
-          </div>
-
-            <div className="grid grid-cols-2 gap-2">
-      {/* low stock*/}
-       <div>
-        <p className="text-sm text-gray-500 mb-1">Low Stock</p>
-        <Input
-      className="bg-slate-200 border-slate-300"
-      value={editForm.low_stock_threshold || ""}
-      onChange={(e) =>
-        setEditForm({ ...editForm, low_stock_threshold: e.target.value })
-      }
-            />
-          </div>
-         {/* expiry */}
-        <div>
-            <p className="text-sm text-gray-500 mb-1">Expiry Date</p>
-             <Input
-             type="date"
-                 className="bg-slate-200 border-slate-300"
-                value={editForm.expiry_date || ""}
-              onChange={(e) =>
-                 setEditForm({ ...editForm, expiry_date: e.target.value })
-                 }
-              />
-             </div>
-          </div>
-          
-          <div className="text-sm text-gray-500">Supplier</div>
-      <Input  
-        value={editForm.supplier || ""}
-        onChange={(e) =>
-          setEditForm({ ...editForm, supplier: e.target.value })
-        }
-        className="bg-slate-200 border-slate-300 w-full p-3 rounded-xl"
-
-      />
-        <div className="text-sm text-gray-500">Location</div>
-      <Input  
-        value={editForm.location || ""}
-        onChange={(e) =>
-          setEditForm({ ...editForm, location: e.target.value })
-        }
-        className="bg-slate-200 border-slate-300 w-full p-3 rounded-xl"
-      />
-            </div>
-
-        <div className="space-y-1">
-        <p className="text-sm text-gray-500">Product Image</p>
-
-             <input
-           type="file"
-           accept="image/*"
-           className="w-full p-2 rounded-xl "
-           onChange={(e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm({
-          ...editForm,
-          image: reader.result,
-        });
-      };
-      reader.readAsDataURL(file);
-            }}
-             />
-
-          {/* PREVIEW */}
-          {editForm.image && (
-         <img
-        src={editForm.image}
-      alt="preview"
-      className="w-20 h-20 object-cover rounded-xl mt-2 border"
-          />
+  </div>
+))
           )}
+
+          {toast.show && (
+  <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl shadow-lg z-50">
+    {toast.message}
+  </div>
+)}
+        </div>
+      </div>
+
+      {/* EDIT */}
+    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+  <DialogContent className="bg-white max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-6">
+
+    {/* HEADER */}
+    <DialogHeader>
+      <DialogTitle className="text-lg font-bold">
+        Edit Product
+      </DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-6 mt-4">
+
+      {/* PRODUCT INFO */}
+      <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Product Information
+        </p>
+
+        {/* NAME */}
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Product Name</p>
+          <Input
+            className="bg-white"
+            value={editForm.name || ""}
+            onChange={(e) =>
+              setEditForm({ ...editForm, name: e.target.value })
+            }
+          />
         </div>
 
-        <DialogFooter className="mt-4 ">
-      <Button 
-        onClick={handleEdit}
-        className="w-full text-white bg-gradient-to-r from-blue-400 to-blue-700 hover:to-blue-800 rounded-xl"
-        >Save</Button>
-            </DialogFooter>
-          </DialogContent>
-          </Dialog>
+        {/* SKU */}
+        <div>
+          <p className="text-xs text-gray-500 mb-1">SKU</p>
+          <Input
+            className="bg-white"
+            value={editForm.sku || ""}
+            onChange={(e) =>
+              setEditForm({ ...editForm, sku: e.target.value })
+            }
+          />
+        </div>
+
+        {/* CATEGORY */}
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Category</p>
+          <select
+            className="w-full p-2 border rounded-lg bg-white text-sm"
+            value={editForm.category || ""}
+            onChange={(e) =>
+              setEditForm({ ...editForm, category: e.target.value })
+            }
+          >
+            <option value="">Select Category</option>
+            <option value="Beverages">Beverages</option>
+            <option value="Snacks">Snacks</option>
+            <option value="Canned Goods">Canned Goods</option>
+            <option value="Dairy">Dairy</option>
+            <option value="Frozen">Frozen</option>
+            <option value="Household">Household</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      {/* INVENTORY */}
+      <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Inventory
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Quantity</p>
+            <Input
+              className="bg-white"
+              type="number"
+              value={editForm.quantity || ""}
+              onChange={(e) =>
+                setEditForm({ ...editForm, quantity: e.target.value })
+              }
+            />
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Unit</p>
+            <Input
+              className="bg-white"
+              value={editForm.unit || ""}
+              onChange={(e) =>
+                setEditForm({ ...editForm, unit: e.target.value })
+              }
+            />
+          </div>
+
+        </div>
+      </div>
+
+      {/* PRICING */}
+      <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Pricing
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Cost Price</p>
+            <Input
+              className="bg-white"
+              type="number"
+              value={editForm.cost_price || ""}
+              onChange={(e) =>
+                setEditForm({ ...editForm, cost_price: e.target.value })
+              }
+            />
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Selling Price</p>
+            <Input
+              className="bg-white"
+              type="number"
+              value={editForm.selling_price || ""}
+              onChange={(e) =>
+                setEditForm({ ...editForm, selling_price: e.target.value })
+              }
+            />
+          </div>
+
+        </div>
+      </div>
+
+      {/* OTHER DETAILS */}
+      <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Other Details
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+          <p className="text-xs text-gray-500 mb-1">Expiration Date</p>
+          <Input
+            type="date"
+            value= {editForm.expiration_date || ""}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                expiration_date: e.target.value,
+              })
+            }
+            className=" bg-white"
+          />
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Location</p>
+          <Input
+            className="bg-white"
+            value={editForm.location || ""} 
+            onChange={(e) =>
+              setEditForm({ ...editForm, location: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      
+        <div className="mt-3">
+          <p className="text-xs text-gray-500 mb-1">Supplier</p>
+          <Input
+            className="bg-white"
+            value={editForm.supplier || ""}
+            onChange={(e) =>
+              setEditForm({ ...editForm, supplier: e.target.value })
+            }
+          />
+        </div>
+</div>
+
+      {/* QR SECTION (BELOW PRODUCT INFO) */}
+      <div className="bg-gray-50 p-4 rounded-xl text-center">
+        <p className="text-center text-xs font-semibold text-gray-500 mb-3">
+          Product QR Code (Locked)
+        </p>
+
+        <img
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
+            editForm.qr_code || ""
+          )}`}
+          className="mx-auto border rounded-lg"
+        />
+
+        <p className="text-center text-xs text-gray-400 mt-2">
+          ID: {editForm.qr_code}
+        </p>
+      </div>
+
+      {/* IMAGE (BOTTOM) */}
+      <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+        <p className="text-xs font-semibold text-gray-500">
+          Product Image
+        </p>
+
+        <Input
+          type="file"
+          accept="image/*"
+          className="bg-white border p-2 rounded-lg"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setEditForm({
+                ...editForm,
+                image: reader.result,
+              });
+            };
+            reader.readAsDataURL(file);
+          }}
+        />
+
+        {editForm.image && (
+          <img
+            src={editForm.image}
+            className="w-20 h-20 object-cover rounded-lg border"
+          />
+        )}
+      </div>
+
+    </div>
+
+    {/* SAVE BUTTON */}
+    <DialogFooter className="mt-6">
+      <Button
+        onClick={handleSave}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+      >
+        Save Changes
+      </Button>
+    </DialogFooter>
+
+  </DialogContent>
+</Dialog>
 
       {/* DELETE */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent className="text-gray-800 bg-white rounded-md mt-4">
-          <AlertDialogHeader>
-            <AlertDialogTitle >Delete Product?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-gray-500 mt-2">
-              Are you sure you want to delete this product? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+  <AlertDialogContent className="bg-white rounded-2xl p-6 max-w-md">
 
-          <AlertDialogFooter>
-            <AlertDialogCancel className=" bg-white hover:bg-gray-100 rounded-md mt-4">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="text-white bg-red-500 hover:bg-red-600 rounded-md mt-1">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+    {/* HEADER */}
+    <AlertDialogHeader className="text-center space-y-3">
+
+      {/* ICON */}
+      <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+        <AlertTriangle className="text-red-500 w-6 h-6" />
       </div>
-          );
-          }
 
+      <AlertDialogTitle className="text-lg font-bold">
+        Delete Product?
+      </AlertDialogTitle>
+
+      <AlertDialogDescription className="text-sm text-gray-500">
+        This action cannot be undone. The product and all related data will be permanently removed.
+      </AlertDialogDescription>
+
+    </AlertDialogHeader>
+
+    {/* FOOTER */}
+    <AlertDialogFooter className="mt-6 flex gap-2">
+
+      <AlertDialogCancel className="w-full bg-gray-100 hover:bg-gray-200 rounded-xl">
+        Cancel
+      </AlertDialogCancel>
+
+      <AlertDialogAction
+        onClick={handleDelete}
+        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl"
+      >
+        Delete
+      </AlertDialogAction>
+
+    </AlertDialogFooter>
+
+  </AlertDialogContent>
+</AlertDialog>
+
+    </div>
+  );
+}

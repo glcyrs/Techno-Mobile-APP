@@ -10,6 +10,21 @@ export default function PageHeader({
 }) {
   const navigate = useNavigate();
 
+   const user = JSON.parse(
+    localStorage.getItem("currentUser") || "null"
+  );
+
+  const getInitials = (nameOrEmail) => {
+  if (!nameOrEmail) return "U";
+
+  return nameOrEmail
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
+
   return (
     <div className={`px-5 pt-6 pb-4 ${className}`}>
       <div className="flex items-center justify-between">
@@ -54,7 +69,7 @@ export default function PageHeader({
     onClick={() => navigate("/profile")}
     className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold cursor-pointer"
   >
-    R
+    {getInitials(user?.name || user?.email)}
   </div>
 )}
 

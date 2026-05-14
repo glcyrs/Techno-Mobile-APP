@@ -8,7 +8,6 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
 import moment from "moment";
 
 const typeConfig = {
@@ -27,41 +26,33 @@ export default function History() {
   const [filterType, setFilterType] = useState("all");
 
   useEffect(() => {
-    const mockData = [
-      {
-        id: 1,
-        type: "stock_in",
-        product_name: "Coca Cola",
-        quantity: 20,
-        method: "qr_scan",
-        created_date: new Date(),
-        previous_quantity: 0,
-        new_quantity: 20,
-      },
-      {
-        id: 2,
-        type: "sold",
-        product_name: "Rice 5kg",
-        quantity: 2,
-        method: "manual",
-        created_date: new Date(),
-        previous_quantity: 10,
-        new_quantity: 8,
-      },
-      {
-        id: 3,
-        type: "adjustment",
-        product_name: "Soap",
-        quantity: 5,
-        method: "manual",
-        created_date: new Date(),
-        previous_quantity: 15,
-        new_quantity: 20,
-      },
-    ];
+    const load = () => {
+      const stored = JSON.parse(localStorage.getItem("movements") || "[]");
 
-    setMovements(mockData);
-    setLoading(false);
+      const fixed = stored
+        .map((m) => ({
+          ...m,
+          timestamp: Number(m.timestamp),
+        }))
+        .filter((m) =>
+          m.type &&
+          m.product_name &&
+          Number.isFinite(m.timestamp)
+        );
+
+      setMovements(fixed);
+      setLoading(false);
+    };
+
+    load();
+
+    const handleUpdate = () => load();
+
+    window.addEventListener("movementsUpdated", handleUpdate);
+
+    return () => {
+      window.removeEventListener("movementsUpdated", handleUpdate);
+    };
   }, []);
 
   const filtered =
@@ -74,21 +65,26 @@ export default function History() {
     stock_in: "Stock In",
     stock_out: "Stock Out",
     sold: "Sold",
-    adjustment: "Adjustment",
-    return: "Return",
   };
 
+  // ✅ FIXED GROUPING (THIS WAS YOUR MAIN BUG)
   const grouped = filtered.reduce((acc, m) => {
-    const date = moment(m.created_date).format("YYYY-MM-DD");
+    const ts = Number(m.timestamp);
+
+    if (!Number.isFinite(ts)) return acc;
+
+    const date = moment(ts).format("YYYY-MM-DD");
+
     if (!acc[date]) acc[date] = [];
     acc[date].push(m);
+
     return acc;
   }, {});
 
   return (
     <div className="space-y-4 text-gray-900 p-4">
 
-      {/* HEADER WITH BACK BUTTON */}
+      {/* HEADER */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate("/profile")}
@@ -105,7 +101,7 @@ export default function History() {
 
       {/* FILTER */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {["all", "stock_in", "stock_out", "sold", "adjustment", "return"].map((t) => (
+        {["all", "stock_in", "stock_out", "sold"].map((t) => (
           <button
             key={t}
             onClick={() => setFilterType(t)}
@@ -124,7 +120,7 @@ export default function History() {
       <div className="space-y-4">
         {loading ? (
           <div className="text-center text-gray-500">Loading...</div>
-        ) : filtered.length === 0 ? (
+        ) : Object.keys(grouped).length === 0 ? (
           <div className="text-center text-gray-700 py-10">
             No movements yet
           </div>
@@ -132,12 +128,17 @@ export default function History() {
           Object.entries(grouped).map(([date, items]) => (
             <div key={date}>
               <p className="text-sm text-gray-500 mb-2">
-                {moment(date).format("MMM D, YYYY")}
+                {moment(date, "YYYY-MM-DD").format("MMM D, YYYY")}
               </p>
 
               <div className="bg-white rounded-xl divide-y border">
                 {items.map((m) => {
-                  const config = typeConfig[m.type];
+                  const config = typeConfig[m.type] || {
+                    icon: ShoppingCart,
+                    color: "text-gray-500 bg-gray-50",
+                    label: m.type || "unknown",
+                  };
+
                   const Icon = config.icon;
 
                   return (
@@ -176,7 +177,7 @@ export default function History() {
                         </p>
 
                         <p className="text-[12px] text-gray-400">
-                          {m.previous_quantity} → {m.new_quantity}
+                          {m.previous_quantity ?? "-"} → {m.new_quantity ?? "-"}
                         </p>
                       </div>
                     </div>

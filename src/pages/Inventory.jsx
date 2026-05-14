@@ -4,6 +4,7 @@ import { Plus, Search, Filter, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ProductCard from "../components/inventory/ProductCard";
+import jsPDF from "jspdf";
 import {
   Select,
   SelectTrigger,
@@ -30,45 +31,165 @@ const CATEGORIES = [
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
+  
+  const addMovement = (message) => {
+  const logs = JSON.parse(localStorage.getItem("movements")) || [];
+
+  const newLog = {
+    id: Date.now(),
+    action: message,
+    date: new Date().toLocaleString(),
+  };
+
+  logs.unshift(newLog);
+  localStorage.setItem("movements", JSON.stringify(logs));
+
+  window.dispatchEvent(new Event("productsUpdated"));
+};
+
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
 
-  const handleDownloadAll = () => {
-    console.log("Download all QR");
-  };
+ const handleDownloadAll = async () => {
+  const products = JSON.parse(localStorage.getItem("products")) || [];
+
+  const doc = new jsPDF();
+
+  const grouped = products.reduce((acc, p) => {
+    const cat = p.category || "Others";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(p);
+    return acc;
+  }, {});
+
+  // GRID SETTINGS
+  const margin = 20;
+  const cols = 4;
+  const spacingX = 45; // mas safe spacing
+  const spacingY = 85; // IMPORTANT: increased vertical spacing
+
+  let y = 20;
+
+  for (const category in grouped) {
+    const items = grouped[category];
+
+    doc.setFontSize(14);
+    doc.text(category, margin, y);
+    y += 15;
+
+    let colIndex = 0;
+    let rowY = y;
+
+    for (let i = 0; i < items.length; i++) {
+      const product = items[i];
+
+      const x = margin + colIndex * spacingX;
+
+      const qrSize = 30;
+      const textWidth = 30;
+
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+        product.qr_code || product.id
+      )}`;
+
+      const imgData = await fetch(qrUrl)
+        .then((res) => res.blob())
+        .then(
+          (blob) =>
+            new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            })
+        );
+
+      doc.setFontSize(8);
+
+      // product name
+      const nameLines = doc.splitTextToSize(
+        product.name || "No Name",
+        textWidth
+      );
+
+      const textHeight = nameLines.length * 4;
+
+      doc.text(nameLines, x + qrSize / 2, rowY, {
+        align: "center",
+      });
+
+      // QR image
+      doc.addImage(
+        imgData,
+        "PNG",
+        x,
+        rowY + textHeight + 2,
+        qrSize,
+        qrSize
+      );
+
+      // ID text
+      doc.text(
+        `ID: ${product.qr_code || product.id}`,
+        x + qrSize / 2,
+        rowY + textHeight + qrSize + 8,
+        { align: "center" }
+      );
+
+      colIndex++;
+
+      // MOVE TO NEXT ROW
+      if (colIndex === cols) {
+        colIndex = 0;
+        rowY += spacingY;
+      }
+
+      // PAGE BREAK FIX
+      if (rowY > 250) {
+        doc.addPage();
+        y = 20;
+        rowY = y;
+        colIndex = 0;
+      }
+    }
+
+    // spacing after category
+    y = rowY + spacingY;
+  }
+
+  doc.save("All_Product_QR.pdf");
+};
 
   useEffect(() => {
-    const mockProducts = [
-      {
-        id: 1,
-        name: "Coca Cola 1.5L",
-        sku: "COKE-001",
-        category: "Beverages",
-        quantity: 20,
-        unit: "bottles",
-      },
-      {
-        id: 2,
-        name: "Lucky Me Pancit Canton",
-        sku: "LM-002",
-        category: "Snacks",
-        quantity: 5,
-        unit: "packs",
-      },
-      {
-        id: 3,
-        name: "Rice 5kg",
-        sku: "RICE-003",
-        category: "Rice & Grains",
-        quantity: 2,
-        unit: "bags",
-      },
-    ];
-
-    setProducts(mockProducts);
+  const loadProducts = () => {
+    const stored = JSON.parse(localStorage.getItem("products")) || [];
+    setProducts(stored);
     setLoading(false);
+  };
+
+  loadProducts();
+
+  window.addEventListener("productsUpdated", loadProducts);
+
+  return () => {
+    window.removeEventListener("productsUpdated", loadProducts);
+  };
+}, []);
+
+ useEffect(() => {
+    const handleUpdate = () => {
+      const stored = JSON.parse(localStorage.getItem("products")) || [];
+      setProducts(stored);
+    };
+
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("productsUpdated", handleUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("productsUpdated", handleUpdate);
+    };
   }, []);
 
   const filtered = products.filter((p) => {

@@ -21,16 +21,34 @@ export default function Statistics() {
   const [range, setRange] = useState("30");
 
   useEffect(() => {
-    async function load() {
-      const storedProducts = JSON.parse(localStorage.getItem("products") || "[]");
-      const storedMovements = JSON.parse(localStorage.getItem("movements") || "[]");
+  const load = () => {
+    const storedProducts = JSON.parse(localStorage.getItem("products") || "[]");
+    const storedMovements = JSON.parse(localStorage.getItem("movements") || "[]");
 
-      setProducts(storedProducts);
-      setMovements(storedMovements);
-      setLoading(false);
-    }
-    load();
-  }, []);
+    const fixedMovements = storedMovements
+      .map((m) => ({
+        ...m,
+        timestamp: Number(m.timestamp),
+      }))
+      .filter((m) => !isNaN(m.timestamp));
+
+    setProducts(storedProducts);
+    setMovements(fixedMovements);
+    setLoading(false);
+  };
+
+  load();
+
+  const handleUpdate = () => load();
+
+  window.addEventListener("productsUpdated", handleUpdate);
+  window.addEventListener("movementsUpdated", handleUpdate);
+
+  return () => {
+    window.removeEventListener("productsUpdated", handleUpdate);
+    window.removeEventListener("movementsUpdated", handleUpdate);
+  };
+}, []);
 
   if (loading) {
     return (
@@ -43,31 +61,56 @@ export default function Statistics() {
   const days = parseInt(range);
   const cutoff = startOfDay(subDays(new Date(), days));
 
-  const filteredMovements = movements.filter(
-    (m) => m.created_date && isAfter(new Date(m.created_date), cutoff)
+  //  use timestamp (NOT created_date)
+const cleanMovements = movements
+  .map((m) => ({
+    ...m,
+    timestamp: Number(m.timestamp),
+    quantity: Number(m.quantity || 0),
+    product_id: String(m.product_id),
+  }))
+  .filter((m) =>
+    m.timestamp &&
+    !isNaN(m.timestamp) &&
+    m.type &&
+    (m.type === "sold" || m.type === "stock_in")
   );
+
+const filteredMovements = cleanMovements.filter((m) => {
+  return m.timestamp >= cutoff.getTime();
+});
 
   const salesMovements = filteredMovements.filter((m) => m.type === "sold");
   const stockInMovements = filteredMovements.filter((m) => m.type === "stock_in");
 
+  //  Revenue
   const totalRevenue = salesMovements.reduce((sum, m) => {
-    const prod = products.find((p) => p.id === m.product_id);
-    return sum + (m.quantity || 0) * (prod?.selling_price || 0);
-  }, 0);
+ const prod = products.find((p) => String(p.id) === String(m.product_id));
+  return sum + (m.quantity || 0) * (prod?.selling_price || 0);
+}, 0);
 
-  const totalCOGS = salesMovements.reduce((sum, m) => {
-    const prod = products.find((p) => p.id === m.product_id);
-    return sum + (m.quantity || 0) * (prod?.cost_price || 0);
-  }, 0);
+  // Cost
+ const totalCOGS = salesMovements.reduce((sum, m) => {
+  const prod = products.find((p) => String(p.id) === String(m.product_id));
+  return sum + (m.quantity || 0) * (prod?.cost_price || 0);
+}, 0);
 
-  const grossProfit = totalRevenue - totalCOGS;
-  const grossMargin = totalRevenue
-    ? ((grossProfit / totalRevenue) * 100).toFixed(1)
-    : 0;
+const grossProfit = totalRevenue - totalCOGS;
 
-  const totalUnitsSold = salesMovements.reduce((s, m) => s + (m.quantity || 0), 0);
-  const totalStockIn = stockInMovements.reduce((s, m) => s + (m.quantity || 0), 0);
+  const totalUnitsSold = salesMovements.reduce(
+    (s, m) => s + (m.quantity || 0),
+    0
+  );
 
+  const totalStockIn = stockInMovements.reduce(
+    (s, m) => s + (m.quantity || 0),
+    0
+  );
+
+  console.log("cutoff:", cutoff);
+console.log("movement dates:", movements.map(m => new Date(m.timestamp)));
+
+  // 📊 DAILY DATA
   const dailyMap = {};
   for (let i = days - 1; i >= 0; i--) {
     const d = format(subDays(new Date(), i), "MMM d");
@@ -75,8 +118,11 @@ export default function Statistics() {
   }
 
   salesMovements.forEach((m) => {
-    const prod = products.find((p) => p.id === m.product_id);
-    const d = format(new Date(m.created_date), "MMM d");
+    const prod = products.find((p) => String(p.id) === String(m.product_id));
+    const dateObj = new Date(m.timestamp);
+if (isNaN(dateObj)) return;
+
+const d = format(dateObj, "MMM d");
 
     if (dailyMap[d]) {
       const rev = (m.quantity || 0) * (prod?.selling_price || 0);
@@ -87,23 +133,26 @@ export default function Statistics() {
     }
   });
 
-  const dailyData = Object.values(dailyMap).slice(-14);
+  const dailyData = Object.values(dailyMap);
 
+  // 🏆 TOP PRODUCTS
   const productSales = {};
 
   salesMovements.forEach((m) => {
-    if (!productSales[m.product_id]) {
-      productSales[m.product_id] = {
+    const key = String(m.product_id);
+
+    if (!productSales[key]) {
+      productSales[key] = {
         name: m.product_name,
         qty: 0,
         revenue: 0,
       };
     }
 
-    const prod = products.find((p) => p.id === m.product_id);
+    const prod = products.find((p) => String(p.id) === key);
 
-    productSales[m.product_id].qty += m.quantity || 0;
-    productSales[m.product_id].revenue +=
+    productSales[key].qty += m.quantity || 0;
+    productSales[key].revenue +=
       (m.quantity || 0) * (prod?.selling_price || 0);
   });
 
@@ -117,12 +166,12 @@ export default function Statistics() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 space-y-5 text-gray-800">
 
-      {/* HEADER WITH BACK BUTTON */}
+      {/* HEADER */}
       <div className="flex items-center gap-3">
 
         <button
           onClick={() => navigate("/profile")}
-          className="p-2 rounded-xl bg-white border shadow-sm active:scale-95 transition"
+          className="p-2 rounded-xl bg-white border shadow-sm"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -134,7 +183,6 @@ export default function Statistics() {
           </p>
         </div>
 
-        {/* RANGE */}
         <select
           value={range}
           onChange={(e) => setRange(e.target.value)}
@@ -146,25 +194,20 @@ export default function Statistics() {
         </select>
       </div>
 
-      {/* STATS CARDS */}
+      {/* STATS */}
       <div className="grid grid-cols-2 gap-3">
-
         <StatCard label="Revenue" value={fmt(totalRevenue)} icon={DollarSign} />
-
         <StatCard
           label="Profit"
           value={fmt(grossProfit)}
           icon={grossProfit >= 0 ? TrendingUp : TrendingDown}
-          color={grossProfit >= 0 ? "text-green-600" : "text-red-500"}
-          sub={`${grossMargin}% margin`}
         />
-
         <StatCard label="Units Sold" value={totalUnitsSold} icon={ShoppingCart} />
         <StatCard label="Stock In" value={totalStockIn} icon={Package} />
       </div>
 
-      {/* CHARTS (unchanged) */}
-      <div className="bg-white border rounded-2xl shadow-sm p-4">
+      {/* LINE CHART */}
+      <div className="bg-white border rounded-2xl p-4">
         <p className="text-sm font-semibold mb-3">Revenue vs Profit</p>
 
         <ResponsiveContainer width="100%" height={200}>
@@ -179,7 +222,8 @@ export default function Statistics() {
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white border rounded-2xl shadow-sm p-4">
+      {/* BAR CHART */}
+      <div className="bg-white border rounded-2xl p-4">
         <p className="text-sm font-semibold mb-3">Top Products</p>
 
         <ResponsiveContainer width="100%" height={180}>
@@ -192,7 +236,8 @@ export default function Statistics() {
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-2">
+      {/* PNL */}
+      <div className="bg-white border rounded-2xl p-4 space-y-2">
         <p className="text-sm font-semibold">Profit & Loss</p>
 
         <Row label="Revenue" value={fmt(totalRevenue)} />
@@ -204,16 +249,15 @@ export default function Statistics() {
   );
 }
 
-/* UI COMPONENTS */
-function StatCard({ label, value, icon: Icon, color = "text-blue-600", sub }) {
+/* COMPONENTS */
+function StatCard({ label, value, icon: Icon }) {
   return (
-    <div className="bg-white border rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-gray-500 text-xs mb-1">
-        <Icon className={`h-4 w-4 ${color}`} />
+    <div className="bg-white border rounded-2xl p-4">
+      <div className="flex items-center gap-2 text-xs text-gray-500">
+        <Icon className="w-4 h-4" />
         {label}
       </div>
       <p className="text-lg font-bold">{value}</p>
-      {sub && <p className="text-xs text-gray-500">{sub}</p>}
     </div>
   );
 }

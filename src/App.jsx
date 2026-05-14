@@ -6,6 +6,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ChoosePlan from "./pages/ChoosePlan";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import ProductDetail from "./pages/ProductDetail";
@@ -15,7 +16,8 @@ import History from "./pages/History";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
-import Statistics from "./pages/Statistics"; // ⚠️ make sure this exists
+import Subscription from "./pages/Subscription";
+import Statistics from "./pages/Statistics"; 
 
 function App() {
   return (
@@ -26,18 +28,21 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/choose-plan" element={<ChoosePlan />} />
 
         {/* WITH NAV */}
         <Route element={<AppLayout />}>
 
-          <Route
+          {/*<Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
             }
-          />
+          />*/}
+
+          <Route path="/dashboard" element={<Dashboard />} />
 
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/product/:id" element={<ProductDetail />} />
@@ -47,6 +52,7 @@ function App() {
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/subscription" element={<Subscription />} />
           <Route path="/statistics" element={<Statistics />} />
 
         </Route>

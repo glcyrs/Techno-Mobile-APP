@@ -5,12 +5,29 @@ import moment from "moment";
 const typeConfig = {
   stock_in: { icon: ArrowDownLeft, color: "#16a34a", label: "Stock In" },
   stock_out: { icon: ArrowUpRight, color: "#ef4444", label: "Stock Out" },
+  sold: { icon: ArrowUpRight, color: "#f59e0b", label: "Sold" },
   adjustment: { icon: RefreshCw, color: "#2563eb", label: "Adjusted" },
   return: { icon: Undo2, color: "#7c3aed", label: "Return" },
 };
 
 export default function RecentMovements({ movements = [] }) {
-  if (movements.length === 0) {
+
+  // ✅ FILTER ONLY VALID DATA (VERY IMPORTANT)
+  const validMovements = movements.filter((m) => {
+    return (
+      m &&
+      typeof m === "object" &&
+      m.id &&
+      m.type &&
+      m.product_name &&
+      typeof m.quantity !== "undefined" &&
+      m.quantity !== null &&
+      !isNaN(m.quantity)
+    );
+  });
+
+  // ❌ EMPTY STATE
+  if (validMovements.length === 0) {
     return (
       <div className="px-5">
         <div className="bg-white rounded-xl border p-6 text-center">
@@ -23,56 +40,59 @@ export default function RecentMovements({ movements = [] }) {
   return (
     <div className="px-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base text-black font-semibold">Recent Activity</h2>
+        <h2 className="text-base text-black font-semibold">
+          Recent Activity
+        </h2>
+
         <Link to="/history" className="text-xs text-blue-600 font-medium">
           View All
         </Link>
       </div>
 
       <div className="bg-white rounded-xl border divide-y">
-        {movements.slice(0, 5).map((m) => {
+        {validMovements.slice(0, 5).map((m) => {
           const config = typeConfig[m.type] || typeConfig.stock_in;
           const Icon = config.icon;
 
+          const qtySign =
+            m.type === "stock_in" || m.type === "return" ? "+" : "-";
+
           return (
             <div key={m.id} className="flex items-center gap-3 p-3.5">
-              {/* icon */}
+
+              {/* ICON */}
               <div
                 className="p-2 rounded-xl"
-                style={{ backgroundColor: config.color + "20", color: config.color }}
+                style={{
+                  backgroundColor: config.color + "20",
+                  color: config.color,
+                }}
               >
                 <Icon className="h-4 w-4" />
               </div>
 
-              {/* info */}
+              {/* INFO */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-black font-medium truncate">
-                  {m.product_name || "Coca Cola 1.5L"}
+                  {m.product_name || "Unknown Product"}
                 </p>
+
                 <p className="text-xs text-gray-500">
                   {config.label} · {m.method || "QR"}
                 </p>
               </div>
 
-              {/* qty + time */}
+              {/* QTY + TIME */}
               <div className="flex flex-col items-end">
-                  <p
-                    className="text-xs font-semibold"
-                    style={{
-                      color:
-                         (m.type || "stock_in") || (m.type === "return")
-                             ? "#16a34a"
-                             : "#ef4444",
-                      }}
-                    >
+                <p className="text-xs font-semibold text-gray-800">
+                  {qtySign}
+                  {m.quantity} {m.unit || "pcs"}
+                </p>
 
-                      {((m.type || "stock_in") === "stock_in" || m.type === "return") ? "+" : "-"}
-                      {m.quantity || 1} {m.unit || "pcs"}
-                    </p>
-               
-                {/* time BELOW qty */}
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  11hours ago {/* moment(m.timestamp).fromNow() */} 
+                  {m.timestamp
+                    ? moment(m.timestamp).fromNow()
+                    : "just now"}
                 </p>
               </div>
             </div>

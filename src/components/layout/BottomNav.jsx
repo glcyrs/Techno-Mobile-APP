@@ -1,23 +1,74 @@
 import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Package,
   ScanLine,
-  Clock,
   Bell,
   User,
 } from "lucide-react";
 
-const navItems = [
-  { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/inventory", icon: Package, label: "Inventory" },
-  { path: "/scan", icon: ScanLine, label: "Scan" },
-  { path: "/alerts", icon: Bell, label: "Alerts" },
-  { path: "/profile", icon: User, label: "Profile" },
-];
-
 export default function BottomNav() {
   const location = useLocation();
+
+  const [alertCount, setAlertCount] = useState(0);
+
+  const computeAlerts = () => {
+  const products = JSON.parse(localStorage.getItem("products") || "[]");
+
+  const now = new Date();
+  const sevenDays = new Date();
+  sevenDays.setDate(now.getDate() + 7);
+
+  // OUT OF STOCK
+  const outStock = products.filter(p => Number(p.quantity) === 0);
+
+  // EXPIRED
+  const expired = products.filter(p => {
+    if (!p.isPerishable || !p.expiration_date) return false;
+
+    const exp = new Date(p.expiration_date);
+    if (isNaN(exp.getTime())) return false;
+
+    return exp < now;
+  });
+
+  // EXPIRING SOON (within 7 days)
+  const expiringSoon = products.filter(p => {
+    if (!p.isPerishable || !p.expiration_date) return false;
+
+    const exp = new Date(p.expiration_date);
+    if (isNaN(exp.getTime())) return false;
+
+    return exp >= now && exp <= sevenDays;
+  });
+
+  // ✅ TOTAL (NO DUPLICATES)
+  const total = outStock.length + expired.length + expiringSoon.length;
+
+  setAlertCount(total);
+};
+
+
+  useEffect(() => {
+    computeAlerts();
+
+    const handleUpdate = () => computeAlerts();
+
+    window.addEventListener("productsUpdated", handleUpdate);
+
+    return () => {
+      window.removeEventListener("productsUpdated", handleUpdate);
+    };
+  }, []);
+
+  const navItems = [
+    { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { path: "/inventory", icon: Package, label: "Inventory" },
+    { path: "/scan", icon: ScanLine, label: "Scan" },
+    { path: "/alerts", icon: Bell, label: "Alerts" },
+    { path: "/profile", icon: User, label: "Profile" },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t">
@@ -34,11 +85,11 @@ export default function BottomNav() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+              className={`relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                 isScan ? "-mt-6" : ""
               } ${isActive && !isScan ? "text-blue-800" : "text-gray-400"}`}
             >
-              {/* scan button special */}
+              {/* SCAN BUTTON */}
               {isScan ? (
                 <div
                   className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${
@@ -50,11 +101,20 @@ export default function BottomNav() {
                   <ScanLine className="h-6 w-6" />
                 </div>
               ) : (
-                <item.icon
-                  className={`h-5 w-5 ${
-                    isActive ? "stroke-[2.5px]" : ""
-                  }`}
-                />
+                <div className="relative">
+                  <item.icon
+                    className={`h-5 w-5 ${
+                      isActive ? "stroke-[2.5px]" : ""
+                    }`}
+                  />
+
+                  {/* 🔥 ALERT BADGE */}
+                  {item.path === "/alerts" && alertCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                      {alertCount}
+                    </span>
+                  )}
+                </div>
               )}
 
               <span
@@ -69,7 +129,6 @@ export default function BottomNav() {
         })}
       </div>
 
-      {/* safe area */}
       <div className="h-6 bg-white" />
     </nav>
   );

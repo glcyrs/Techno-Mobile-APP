@@ -6,27 +6,31 @@ export default function ProductCard({ product }) {
     product.quantity <= (product.low_stock_threshold || 5);
   const isOutOfStock = product.quantity === 0;
 
+  const borderColor = isOutOfStock
+    ? "border-red-300"
+    : isLowStock
+    ? "border-amber-300"
+    : "border-blue-300";
+
   return (
     <Link
       to={`/product/${product.id}`}
-      className="flex items-center gap-3 bg-white rounded-xl border-blue-300 border p-3.5 active:scale-[0.98] transition-transform"
+      className={`flex items-center gap-3 bg-white rounded-xl border ${borderColor} p-3.5 active:scale-[0.98] transition-transform`}
     >
-      {/* image */}
+      {/* IMAGE */}
       <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
         {product.image ? (
           <img
-            src={product.image_url}
-            alt={product.name_url}
+            src={product.image}   //  FIXED
+            alt={product.name}     //  FIXED
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
-          <Package />
-      </div>
+          <Package className="w-5 h-5 text-gray-400" />
         )}
       </div>
 
-      {/* info */}
+      {/* INFO */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate text-gray-900">
           {product.name}
@@ -37,7 +41,7 @@ export default function ProductCard({ product }) {
         </p>
       </div>
 
-      {/* stock */}
+      {/* STOCK */}
       <div className="flex items-center gap-2">
         <div className="text-right">
           <p
@@ -56,7 +60,6 @@ export default function ProductCard({ product }) {
           </p>
         </div>
 
-        {/* warning icon */}
         {isLowStock && (
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
         )}

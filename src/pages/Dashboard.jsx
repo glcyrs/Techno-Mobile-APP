@@ -14,26 +14,50 @@ import CategoryChart from "../components/dashboard/CategoryChart";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [movements, setMovements] = useState([]);
 
-  // MOCK DATA 
-  const [products] = useState([
-    { name: "Milk", quantity: 10, low_stock_threshold: 5, selling_price: 50, category: "Dairy" },
-    { name: "Bread", quantity: 2, low_stock_threshold: 5, selling_price: 30, category: "Bakery" },
-    { name: "Egg", quantity: 20, low_stock_threshold: 5, selling_price: 10, category: "Dairy" },
-    { name: "Rice", quantity: 8, low_stock_threshold: 5, selling_price: 60, category: "Grains" },
-  ]);
-
-  const [movements] = useState([
-    { id: 1, action: "Added Milk stock" },
-    { id: 2, action: "Bread is low stock" },
-    { id: 3, action: "Egg updated" },
-  ]);
-
+  // ======================
+  // PRODUCTS (INVENTORY)
+  // ======================
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
+    const loadProducts = () => {
+      const stored = JSON.parse(localStorage.getItem("products")) || [];
+      setProducts(stored);
+      setLoading(false);
+    };
+
+    loadProducts();
+
+    return () => {
+      window.removeEventListener("storage", loadProducts);
+      window.removeEventListener("productsUpdated", loadProducts);
+    };
   }, []);
 
+  // ======================
+  // MOVEMENTS (FIXED)
+  // ======================
+  useEffect(() => {
+  const loadMovements = () => {
+    const logs = JSON.parse(localStorage.getItem("movements")) || [];
+    setMovements(logs);
+  };
+
+  loadMovements();
+
+  window.addEventListener("movementsUpdated", loadMovements);
+  window.addEventListener("storage", loadMovements);
+
+  return () => {
+    window.removeEventListener("movementsUpdated", loadMovements);
+    window.removeEventListener("storage", loadMovements);
+  };
+}, []);
+
+  // ======================
+  // LOADING SCREEN
+  // ======================
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#0b0f19] text-white">
@@ -42,14 +66,23 @@ export default function Dashboard() {
     );
   }
 
-  // 📊 CALCULATIONS
+  // ======================
+  // CALCULATIONS
+  // ======================
   const totalProducts = products.length;
-  const totalStock = products.reduce((sum, p) => sum + p.quantity, 0);
+
+  const totalStock = products.reduce(
+    (sum, p) => sum + (Number(p.quantity) || 0),
+    0
+  );
+
   const lowStockItems = products.filter(
     (p) => p.quantity <= p.low_stock_threshold
   );
+
   const totalValue = products.reduce(
-    (sum, p) => sum + p.quantity * p.selling_price,
+    (sum, p) =>
+      sum + (Number(p.quantity) || 0) * (Number(p.selling_price) || 0),
     0
   );
 
@@ -62,11 +95,9 @@ export default function Dashboard() {
         title="SmartStock"
         subtitle="Scan. Track. Manage — Smarter."
       />
+
       {/* ALERT */}
-      <AlertBanner
-        lowStockCount={lowStockItems.length}
-        expiringCount={2}
-      />
+      <AlertBanner products={products} />
 
       {/* STATS */}
       <div className="px-5 grid grid-cols-2 gap-3">
@@ -76,14 +107,13 @@ export default function Dashboard() {
         <StatsCard icon={TrendingUp} label="Stock Value" value={`₱${totalValue}`} color="destructive"/>
       </div>
 
-      {/* CATEGORY CHART (still frontend data) */}
+      {/* CATEGORY CHART */}
       <div className="px-5">
         <CategoryChart products={products} />
       </div>
 
       {/* RECENT MOVEMENTS */}
-      <RecentMovements movements={movements} />
-
+      <RecentMovements movements={movements.slice(0, 10)} />
     </div>
   );
 }
