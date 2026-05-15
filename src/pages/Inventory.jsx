@@ -31,7 +31,6 @@ const CATEGORIES = [
 
 export default function Inventory() {
   const [products, setProducts] = useState([]);
-  
   const addMovement = (message) => {
   const logs = JSON.parse(localStorage.getItem("movements")) || [];
 
@@ -46,7 +45,6 @@ export default function Inventory() {
 
   window.dispatchEvent(new Event("productsUpdated"));
 };
-
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");

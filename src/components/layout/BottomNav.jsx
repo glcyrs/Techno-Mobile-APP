@@ -13,38 +13,51 @@ export default function BottomNav() {
 
   const [alertCount, setAlertCount] = useState(0);
 
-  const computeAlerts = () => {
+const computeAlerts = () => {
   const products = JSON.parse(localStorage.getItem("products") || "[]");
 
   const now = new Date();
   const sevenDays = new Date();
   sevenDays.setDate(now.getDate() + 7);
 
-  // OUT OF STOCK
-  const outStock = products.filter(p => Number(p.quantity) === 0);
+  const thirtyDays = new Date();
+  thirtyDays.setDate(now.getDate() + 30);
 
-  // EXPIRED
+  // STOCK
+  const outStock = products.filter(p => Number(p.quantity ?? 0) === 0);
+
+  const lowStock = products.filter(p => {
+    const qty = Number(p.quantity ?? 0);
+    const threshold = Number(p.low_stock_threshold ?? 5);
+    return qty > 0 && qty <= threshold;
+  });
+
+  // EXPIRY
   const expired = products.filter(p => {
-    if (!p.isPerishable || !p.expiration_date) return false;
-
+    if (!p.expiration_date) return false;
     const exp = new Date(p.expiration_date);
-    if (isNaN(exp.getTime())) return false;
-
-    return exp < now;
+    return !isNaN(exp) && exp < now;
   });
 
-  // EXPIRING SOON (within 7 days)
   const expiringSoon = products.filter(p => {
-    if (!p.isPerishable || !p.expiration_date) return false;
-
+    if (!p.expiration_date) return false;
     const exp = new Date(p.expiration_date);
-    if (isNaN(exp.getTime())) return false;
-
-    return exp >= now && exp <= sevenDays;
+    return !isNaN(exp) && exp >= now && exp <= sevenDays;
   });
 
-  // ✅ TOTAL (NO DUPLICATES)
-  const total = outStock.length + expired.length + expiringSoon.length;
+  const expiringLater = products.filter(p => {
+    if (!p.expiration_date) return false;
+    const exp = new Date(p.expiration_date);
+    return !isNaN(exp) && exp > sevenDays && exp <= thirtyDays;
+  });
+
+  // TOTAL (MATCH ALERTS PAGE)
+  const total =
+    outStock.length +
+    lowStock.length +
+    expired.length +
+    expiringSoon.length +
+    expiringLater.length;
 
   setAlertCount(total);
 };

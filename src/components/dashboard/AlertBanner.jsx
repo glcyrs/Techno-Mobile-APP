@@ -13,29 +13,58 @@ export default function AlertBanner({ products = [] }) {
  
  
   // LOW STOCK COUNT (REAL)
-  const lowStockItems = products.filter(
-    (p) => Number(p.quantity) <= Number(p.low_stock_threshold || 0)
-  );
+const outStockItems = products.filter(
+  (p) => Number(p.quantity) === 0
+);
 
-  // EXPIRING SOON (REAL if may expiration_date ka)
- const expiringItems = products.filter((p) => {
-  if (!p.isPerishable) return false;
-  if (!p.expiration_date) return false;
+const lowStockItems = products.filter((p) => {
+  const qty = parseFloat(p.quantity ?? 0);
+  const threshold = parseFloat(p.low_stock_threshold ?? 5);
 
-  const today = new Date();
-  const expDate = new Date(p.expiration_date);
-
-  // REMOVE TIME (important fix)
-  today.setHours(0, 0, 0, 0);
-  expDate.setHours(0, 0, 0, 0);
-
-  const diffDays = (expDate - today) / (1000 * 60 * 60 * 24);
-
-  return diffDays >= 0 && diffDays <= 7;
+  return qty > 0 && qty <= threshold;
 });
 
-  const lowStockCount = lowStockItems.length;
-  const expiringCount = expiringItems.length;
+  // EXPIRING SOON (REAL if may expiration_date)
+const now = new Date();
+const sevenDays = new Date();
+sevenDays.setDate(now.getDate() + 7);
+
+const thirtyDays = new Date();
+thirtyDays.setDate(now.getDate() + 30);
+
+const expiredItems = products.filter((p) => {
+  if (!p.expiration_date) return false;
+
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return exp < now;
+});
+
+const expiringSoonItems = products.filter((p) => {
+  if (!p.expiration_date) return false;
+
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return exp >= now && exp <= sevenDays;
+});
+
+const expiringLaterItems = products.filter((p) => {
+  if (!p.expiration_date) return false;
+
+  const exp = new Date(p.expiration_date);
+  if (isNaN(exp)) return false;
+
+  return exp > sevenDays && exp <= thirtyDays;
+});
+
+  const lowStockCount = lowStockItems.length + outStockItems.length;
+
+const expiringCount =
+  expiredItems.length +
+  expiringSoonItems.length +
+  expiringLaterItems.length;
 
   if (lowStockCount === 0 && expiringCount === 0) return null;
 
@@ -54,7 +83,7 @@ export default function AlertBanner({ products = [] }) {
 
           <div className="flex-1">
             <p className="text-sm font-semibold text-amber-800">
-              Low Stock Alert
+              Stock Alerts
             </p>
             <p className="text-xs text-amber-600">
               {lowStockCount} item{lowStockCount > 1 ? "s" : ""} need restocking
@@ -77,7 +106,7 @@ export default function AlertBanner({ products = [] }) {
 
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800">
-              Expiring Soon
+              Expiry Alerts
             </p>
             <p className="text-xs text-red-600">
               {expiringCount} item{expiringCount > 1 ? "s" : ""} are near or about to expire

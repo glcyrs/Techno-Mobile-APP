@@ -42,8 +42,14 @@ useEffect(() => {
   const thirtyDays = addDays(now, 30);
 
   // STOCK LOGIC
-  const lowStock = products.filter(p => p.quantity <= p.low_stock_threshold && p.quantity > 0);
-  const outStock = products.filter(p => p.quantity === 0);
+  const outStock = products.filter(p => Number(p.quantity) === 0);
+
+const lowStock = products.filter(p => {
+  const qty = Number(p.quantity);
+  const threshold = Number(p.low_stock_threshold ?? 5);
+
+  return qty > 0 && qty <= threshold;
+});
 
   // EXPIRY LOGIC
   const expiringSoon = products.filter(p => {
